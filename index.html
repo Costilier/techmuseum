@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Museum of Tech History</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Courier+Prime&family=Inter:wght@300;800&family=Lato:wght@300;400&family=Montserrat:wght@500;900&family=Press+Start+2P&family=Rajdhani:wght@500;700&family=Silkscreen&family=Syncopate:wght@700&family=Varela+Round&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- GLOBAL SETTINGS --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; cursor: none; /* HIDE DEFAULT CURSOR */ }
+        
+        html, body {
+            height: 100%;
+            background: #050505;
+            overflow-x: hidden; 
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        /* --- ELECTRIC CURSOR LAYER (Clean & Glowing) --- */
+        #cursor-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 99999;
+        }
+
+        /* --- TEXTURE --- */
+        #noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 950; opacity: 0.07;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* --- START SCREEN --- */
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9998;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: white; font-family: 'Courier Prime', monospace;
+            transition: opacity 1s ease;
+        }
+        #start-btn {
+            padding: 15px 30px; border: 1px solid white; background: transparent; color: white;
+            font-size: 1.5rem; cursor: none; margin-top: 20px;
+            transition: all 0.3s; text-transform: uppercase; letter-spacing: 2px;
+        }
+        #start-btn:hover { background: #fff; color: #000; box-shadow: 0 0 30px rgba(255,255,255,0.5); }
+
+        /* CREATOR CREDITS */
+        .creator-credits {
+            position: absolute;
+            bottom: 50px;
+            text-align: center;
+            opacity: 0.6;
+            animation: breathe 4s ease-in-out infinite;
+        }
+        .creator-credits h3 {
+            font-size: 1rem;
+            font-weight: normal;
+            letter-spacing: 4px;
+            margin-bottom: 5px;
+            color: #ccc;
+            text-transform: uppercase;
+        }
+        .creator-credits span {
+            font-size: 0.8rem;
+            letter-spacing: 6px;
+            color: #666;
+            display: block;
+        }
+        @keyframes breathe {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; text-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
+        }
+
+        /* --- POPUP UI --- */
+        #blur-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(15px);
+            opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
+            z-index: 900;
+        }
+        #blur-overlay.active { opacity: 1; pointer-events: auto; }
+
+        .clone-img {
+            position: fixed; z-index: 1000; pointer-events: none; object-fit: contain; transition: none; 
+        }
+
+        .chat-bubble {
+            position: fixed; 
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(10, 10, 10, 0.95); 
+            color: #ccc;
+            padding: 50px; 
+            width: 90%; max-width: 700px;
+            max-height: 80vh; overflow-y: auto; 
+            border-radius: 4px;
+            box-shadow: 0 50px 100px rgba(0,0,0,1);
+            font-family: 'Courier Prime', monospace;
+            font-size: 1rem; 
+            line-height: 1.8;
+            z-index: 1001; opacity: 0; 
+            pointer-events: none; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .chat-bubble.active { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+        .chat-bubble strong { display: block; margin-bottom: 25px; font-size: 2.5rem; text-transform: uppercase; color: #fff; border-bottom: 1px solid #444; padding-bottom: 15px; letter-spacing: -1px;}
+        
+        .close-btn { 
+            position: absolute; top: 20px; right: 25px; 
+            cursor: pointer; font-size: 2rem; opacity: 0.5; color: white;
+        }
+        .close-btn:hover { opacity: 1; color: #fff; }
+
+        /* --- SECTIONS --- */
+        section {
+            height: 100vh; width: 100%; position: relative;
+            overflow: hidden;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            scroll-snap-align: start;
+        }
+
+        .giant-year {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 35vw; font-weight: 900; color: transparent;
+            -webkit-text-stroke: 2px rgba(255, 255, 255, 0.05);
+            z-index: 1; pointer-events: none; user-select: none; white-space: nowrap;
+        }
+
+        .center-text {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; pointer-events: none; z-index: 5; width: 80%; opacity: 0;
+            text-shadow: 0 10px 30px rgba(0,0,0,0.8); 
+        }
+        .center-text h1 { font-size: 9rem; margin: 0; line-height: 1; opacity: 1; letter-spacing: -2px; }
+        .center-text p { font-size: 1.5rem; opacity: 0.9; letter-spacing: 5px; text-transform: uppercase; margin-top: 10px; font-weight: bold;}
+
+        /* --- ANIMATED BACKGROUNDS --- */
+        .animated-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; overflow: hidden; opacity: 0.7; filter: blur(50px); pointer-events: none;
+        }
+        /* 1990 */
+        .bg-1990 { background: linear-gradient(transparent 90%, #39ff14 90%), linear-gradient(90deg, transparent 90%, #39ff14 90%); background-size: 100px 100px; background-color: #050505; animation: gridMove 1.5s linear infinite; box-shadow: inset 0 0 150px #000; opacity: 0.8; }
+        @keyframes gridMove { 0% { background-position: 0 0; } 100% { background-position: 100px 100px; } }
+        /* 1995 */
+        .bg-1995 { background: linear-gradient(45deg, #008080, #004d4d, #00ffff, #008080); background-size: 400% 400%; animation: gradientFlow 8s ease infinite; }
+        /* 2000 */
+        .bg-2000 { background-color: #000033; background-image: repeating-linear-gradient(0deg, transparent, transparent 40px, #00ffff 40px, #00ffff 45px); background-size: 100% 100%; animation: scanline 2s linear infinite; }
+        @keyframes scanline { 0% { background-position: 0 0; } 100% { background-position: 0 100vh; } }
+        /* 2005 */
+        .bg-2005 { background: #e0e0e0; }
+        .bg-2005::before, .bg-2005::after { content: ''; position: absolute; border-radius: 50%; mix-blend-mode: multiply; filter: blur(40px); }
+        .bg-2005::before { width: 80vw; height: 80vw; background: #ff0099; top: -30%; left: -20%; animation: orbFloat 5s ease-in-out infinite alternate; opacity: 0.7; }
+        .bg-2005::after { width: 70vw; height: 70vw; background: #00ccff; bottom: -20%; right: -20%; animation: orbFloat 7s ease-in-out infinite alternate-reverse; opacity: 0.7; }
+        @keyframes orbFloat { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(100px, 50px) scale(1.1); } }
+        /* 2010 */
+        .bg-2010 { background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab); background-size: 400% 400%; animation: gradientFlow 10s ease infinite; }
+        /* 2015 */
+        .bg-2015 { background: #121212; overflow: hidden; }
+        .bg-2015::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 150vw; height: 150vw; background: conic-gradient(transparent 80%, #673ab7 100%); border-radius: 50%; animation: radarSpin 4s linear infinite; opacity: 0.6; filter: blur(60px); }
+        @keyframes radarSpin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+        /* 2020 */
+        .bg-2020 { background: #121212; }
+        .bg-2020::before, .bg-2020::after { content: ''; position: absolute; border-radius: 50%; filter: blur(80px); }
+        .bg-2020::before { width: 500px; height: 500px; background: #7f00ff; top: 20%; left: 20%; animation: darkGlow 5s infinite alternate; }
+        .bg-2020::after { width: 400px; height: 400px; background: #e100ff; bottom: 20%; right: 20%; animation: darkGlow 4s infinite alternate-reverse; }
+        @keyframes darkGlow { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.2); opacity: 0.8; } }
+        /* 2025 */
+        .bg-2025 { background: black; overflow: hidden; }
+        .bg-2025::before, .bg-2025::after { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; opacity: 0.3; }
+        .bg-2025::before { background: conic-gradient(from 0deg, transparent, #fff, transparent 30%); animation: rotateNeural 4s linear infinite; }
+        .bg-2025::after { background: conic-gradient(from 180deg, transparent, #00ffff, transparent 30%); animation: rotateNeural 6s linear infinite reverse; }
+        @keyframes rotateNeural { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes gradientFlow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        /* --- OBJECT STYLING & ANIMATIONS --- */
+        
+        /* 1. Base Container */
+        .obj-container {
+            position: absolute; 
+            width: 220px; height: 220px;
+            display: flex; justify-content: center; align-items: center;
+            z-index: 10; opacity: 0; pointer-events: none; 
+            /* Gentle floating animation for idle state */
+            animation: floatIdle 6s ease-in-out infinite; 
+        }
+        .obj-container.clickable { pointer-events: auto; }
+
+        @keyframes floatIdle {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+        }
+
+        /* 2. The Image (Cute Physics & Glow) */
+        .obj-img {
+            width: 100%; height: 100%;
+            object-fit: contain; pointer-events: none;
+            /* Deep shadow for depth */
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+            /* The "Springy" Bounce Transition */
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* 3. HOVER STATE (The Interaction) */
+        .obj-container:hover {
+            z-index: 50;
+            /* Pause floating so it doesn't fight the mouse */
+            animation-play-state: paused;
+        }
+
+        .obj-container:hover .obj-img {
+            /* Snappy Scale Up + Slight Tilt + GLOW */
+            transform: scale(1.25) rotate(-3deg) translateY(-10px);
+            /* The Glowing Thing */
+            filter: drop-shadow(0 0 15px rgba(255,255,255,0.9)) drop-shadow(0 0 40px rgba(0, 255, 255, 0.6));
+        }
+
+        /* --- ERA FONTS --- */
+        .era-1990 { font-family: 'Press Start 2P', cursive; color: #39ff14; }
+        .era-1990 .center-text h1 { color: #222; text-shadow: -2px -2px 0 #39ff14; }
+        .era-1995 { font-family: 'Silkscreen', cursive; color: #fff; }
+        .era-1995 .center-text h1 { font-family: 'Times New Roman', serif; font-style: italic; opacity: 0.3; color: #000; }
+        .era-2000 { font-family: 'Audiowide', cursive; color: #00ffff; }
+        .era-2000 .center-text h1 { text-shadow: 0 0 40px #00ffff; opacity: 0.4; }
+        .era-2005 { font-family: 'Varela Round', sans-serif; color: #ff0066; }
+        .era-2005 .center-text h1 { color: #fff; text-shadow: 0px 5px 15px rgba(0,0,0,0.1); font-size: 8rem; opacity: 1; }
+        .era-2005 p { color: #0066cc; }
+        .era-2010 { font-family: 'Lato', sans-serif; color: #333; }
+        .era-2010 .center-text h1 { color: #555; font-weight: 300; letter-spacing: -5px; opacity: 1; }
+        .era-2015 { font-family: 'Montserrat', sans-serif; color: white; }
+        .era-2020 { font-family: 'Inter', sans-serif; color: #e0e0e0; }
+        .era-2020 .center-text h1 { background: linear-gradient(to right, #7f00ff, #e100ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; opacity: 0.5; }
+        .era-2025 { font-family: 'Syncopate', sans-serif; color: white; }
+        .era-2025 .center-text h1 { font-weight: 700; letter-spacing: 20px; font-size: 5rem; opacity: 0.8; }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="cursor-canvas"></canvas>
+    
+    <div id="void-loader"></div>
+    <div id="noise-overlay"></div>
+    
+    <div id="start-screen">
+        <h1>THE MUSEUM OF TECH HISTORY</h1>
+        <button id="start-btn">ENTER EXHIBITION</button>
+        
+        <div class="creator-credits">
+            <h3>Suryansh Gupta</h3>
+            <span>24BCE2184</span>
+        </div>
+    </div>
+
+    <div id="blur-overlay" onclick="closeModal()"></div>
+    
+    <div id="bubble" class="chat-bubble">
+        <div class="close-btn" onclick="closeModal()">✕</div>
+        <strong id="bubble-title">TITLE</strong>
+        <span id="bubble-text">...</span>
+    </div>
+
+    <audio id="sfx-click" src="click.mp3" preload="auto"></audio>
+    <audio id="bgm-1990" loop preload="none"><source src="music-1990.mp3" type="audio/mpeg"></audio>
+    <audio id="bgm-1995" loop preload="none"><source src="music-1995.mp3" type="audio/mpeg"></audio>
+    <audio id="bgm-2000" loop preload="none"><source src="music-2000.mp3" type="audio/mpeg"></audio>
+    <audio id="bgm-2005" loop preload="none"><source src="music-2005.mp3" type="audio/mpeg"></audio>
+    <audio id="bgm-2010" loop preload="none"><source src="music-2010.mp3" type="audio/mpeg"></audio>
+    <audio id="bgm-2015" loop preload="none"><source src="music-2015.mp3" type="audio/mpeg"></audio>
+    <audio id="bgm-2020" loop preload="none"><source src="music-2020.mp3" type="audio/mpeg"></audio>
+    <audio id="bgm-2025" loop preload="none"><source src="music-2025.mp3" type="audio/mpeg"></audio>
+
+    <section class="era-1990" data-year="1990">
+        <div class="animated-bg bg-1990"></div>
+        <div class="giant-year">1990</div>
+        <div class="center-text"><h1>1990</h1><p>The 8-Bit Era</p></div>
+        
+        <div class="obj-container" style="top:15%; left:10%" onclick="openFact(this, 'gameboy')">
+            <img src="assets/image-removebg-preview.png" class="obj-img" alt="Game Boy">
+        </div>
+        <div class="obj-container" style="top:10%; right:10%" onclick="openFact(this, 'www')">
+            <img src="assets/image-removebg-preview(1).png" class="obj-img" alt="WWW">
+        </div>
+        <div class="obj-container" style="bottom:15%; left:15%" onclick="openFact(this, 'photoshop')">
+            <img src="assets/image-removebg-preview(2).png" class="obj-img" alt="Photoshop">
+        </div>
+        <div class="obj-container" style="bottom:10%; right:15%" onclick="openFact(this, 'hubble')">
+            <img src="assets/image-removebg-preview(3).png" class="obj-img" alt="Hubble">
+        </div>
+        <div class="obj-container" style="top:55%; left:50%; margin-left:-110px;" onclick="openFact(this, 'win3')">
+            <img src="assets/image-removebg-preview(4).png" class="obj-img" alt="Windows 3.0">
+        </div>
+    </section>
+
+    <section class="era-1995" data-year="1995">
+        <div class="animated-bg bg-1995"></div>
+        <div class="giant-year">1995</div>
+        <div class="center-text"><h1>1995</h1><p>Dial-up & Disks</p></div>
+        
+        <div class="obj-container" style="top:10%; left:10%" onclick="openFact(this, 'ps1')">
+            <img src="assets/image-removebg-preview(5).png" class="obj-img" alt="PlayStation 1">
+        </div>
+        <div class="obj-container" style="top:12%; right:15%" onclick="openFact(this, 'dvd')">
+            <img src="assets/image-removebg-preview(6).png" class="obj-img" alt="DVD">
+        </div>
+        <div class="obj-container" style="bottom:20%; left:15%" onclick="openFact(this, 'java')">
+            <img src="assets/image-removebg-preview(7).png" class="obj-img" alt="Java">
+        </div>
+        <div class="obj-container" style="bottom:10%; right:10%" onclick="openFact(this, 'toystory')">
+            <img src="assets/image-removebg-preview(8).png" class="obj-img" alt="Toy Story">
+        </div>
+        <div class="obj-container" style="top:60%; left:50%; margin-left:-110px;" onclick="openFact(this, 'win95')">
+            <img src="assets/image-removebg-preview(38).png" class="obj-img" alt="Windows 95">
+        </div>
+    </section>
+
+    <section class="era-2000" data-year="2000">
+        <div class="animated-bg bg-2000"></div>
+        <div class="giant-year">2000</div>
+        <div class="center-text"><h1>2000</h1><p>Y2K & Mobile</p></div>
+        
+        <div class="obj-container" style="top:15%; left:10%" onclick="openFact(this, 'nokia')">
+            <img src="assets/image-removebg-preview(9).png" class="obj-img" alt="Nokia">
+        </div>
+        <div class="obj-container" style="top:10%; right:10%" onclick="openFact(this, 'usb')">
+            <img src="assets/image-removebg-preview(10).png" class="obj-img" alt="USB">
+        </div>
+        <div class="obj-container" style="bottom:15%; left:15%" onclick="openFact(this, 'ps2')">
+            <img src="assets/image-removebg-preview(11).png" class="obj-img" alt="PS2">
+        </div>
+        <div class="obj-container" style="bottom:10%; right:15%" onclick="openFact(this, 'sims')">
+            <img src="assets/image-removebg-preview(12).png" class="obj-img" alt="Sims">
+        </div>
+        <div class="obj-container" style="top:55%; left:50%; margin-left:-110px;" onclick="openFact(this, 'cameraphone')">
+            <img src="assets/image-removebg-preview(13).png" class="obj-img" alt="Phone">
+        </div>
+    </section>
+
+    <section class="era-2005" data-year="2005">
+        <div class="animated-bg bg-2005"></div>
+        <div class="giant-year">2005</div>
+        <div class="center-text"><h1>2005</h1><p>The Social Web</p></div>
+        
+        <div class="obj-container" style="top:12%; left:15%" onclick="openFact(this, 'youtube')">
+            <img src="assets/image-removebg-preview(14).png" class="obj-img" alt="YouTube">
+        </div>
+        <div class="obj-container" style="top:15%; right:10%" onclick="openFact(this, 'xbox')">
+            <img src="assets/image-removebg-preview(15).png" class="obj-img" alt="Xbox">
+        </div>
+        <div class="obj-container" style="bottom:20%; left:10%" onclick="openFact(this, 'maps')">
+            <img src="assets/image-removebg-preview(16).png" class="obj-img" alt="Maps">
+        </div>
+        <div class="obj-container" style="bottom:10%; right:20%" onclick="openFact(this, 'guitarhero')">
+            <img src="assets/image-removebg-preview(17).png" class="obj-img" alt="Guitar">
+        </div>
+        <div class="obj-container" style="top:60%; left:50%; margin-left:-110px;" onclick="openFact(this, 'reddit')">
+            <img src="assets/image-removebg-preview(18).png" class="obj-img" alt="Reddit">
+        </div>
+    </section>
+
+    <section class="era-2010" data-year="2010">
+        <div class="animated-bg bg-2010"></div>
+        <div class="giant-year">2010</div>
+        <div class="center-text"><h1>2010</h1><p>The App Revolution</p></div>
+        
+        <div class="obj-container" style="top:10%; left:10%" onclick="openFact(this, 'ipad')">
+            <img src="assets/image-removebg-preview(19).png" class="obj-img" alt="iPad">
+        </div>
+        <div class="obj-container" style="top:12%; right:12%" onclick="openFact(this, 'insta')">
+            <img src="assets/image-removebg-preview(20).png" class="obj-img" alt="Insta">
+        </div>
+        <div class="obj-container" style="bottom:12%; left:12%" onclick="openFact(this, 'angrybirds')">
+            <img src="assets/image-removebg-preview(21).png" class="obj-img" alt="Angry Birds">
+        </div>
+        <div class="obj-container" style="bottom:10%; right:10%" onclick="openFact(this, 'siri')">
+            <img src="assets/image-removebg-preview(22).png" class="obj-img" alt="Siri">
+        </div>
+        <div class="obj-container" style="top:50%; left:50%; margin-left:-110px;" onclick="openFact(this, 'minecraft')">
+            <img src="assets/image-removebg-preview(23).png" class="obj-img" alt="Minecraft">
+        </div>
+    </section>
+
+    <section class="era-2015" data-year="2015">
+        <div class="animated-bg bg-2015"></div>
+        <div class="giant-year">2015</div>
+        <div class="center-text"><h1>2015</h1><p>Voice & Wearables</p></div>
+        
+        <div class="obj-container" style="top:15%; left:8%" onclick="openFact(this, 'applewatch')">
+            <img src="assets/image-removebg-preview(24).png" class="obj-img" alt="Watch">
+        </div>
+        <div class="obj-container" style="top:10%; right:15%" onclick="openFact(this, 'echo')">
+            <img src="assets/image-removebg-preview(25).png" class="obj-img" alt="Echo">
+        </div>
+        <div class="obj-container" style="bottom:20%; left:15%" onclick="openFact(this, 'discord')">
+            <img src="assets/image-removebg-preview(26).png" class="obj-img" alt="Discord">
+        </div>
+        <div class="obj-container" style="bottom:10%; right:10%" onclick="openFact(this, 'spacex')">
+            <img src="assets/image-removebg-preview(27).png" class="obj-img" alt="Rocket">
+        </div>
+        <div class="obj-container" style="top:60%; left:50%; margin-left:-110px;" onclick="openFact(this, 'airpods')">
+            <img src="assets/image-removebg-preview(28).png" class="obj-img" alt="AirPods">
+        </div>
+    </section>
+
+    <section class="era-2020" data-year="2020">
+        <div class="animated-bg bg-2020"></div>
+        <div class="giant-year">2020</div>
+        <div class="center-text"><h1>2020</h1><p>The Remote Era</p></div>
+        
+        <div class="obj-container" style="top:12%; left:15%" onclick="openFact(this, 'zoom')">
+            <img src="assets/image-removebg-preview(39).png" class="obj-img" alt="Zoom">
+        </div>
+        <div class="obj-container" style="top:15%; right:8%" onclick="openFact(this, 'ps5')">
+            <img src="assets/image-removebg-preview(29).png" class="obj-img" alt="PS5">
+        </div>
+        <div class="obj-container" style="bottom:15%; left:10%" onclick="openFact(this, 'm1')">
+            <img src="assets/image-removebg-preview(30).png" class="obj-img" alt="Chip">
+        </div>
+        <div class="obj-container" style="bottom:10%; right:15%" onclick="openFact(this, 'tiktok')">
+            <img src="assets/image-removebg-preview(31).png" class="obj-img" alt="TikTok">
+        </div>
+        <div class="obj-container" style="top:55%; left:50%; margin-left:-110px;" onclick="openFact(this, 'spacetourism')">
+            <img src="assets/image-removebg-preview(32).png" class="obj-img" alt="Space">
+        </div>
+    </section>
+
+    <section class="era-2025" data-year="2025">
+        <div class="animated-bg bg-2025"></div>
+        <div class="giant-year">2026</div>
+        <div class="center-text"><h1>2026</h1><p>The AI Age</p></div>
+        
+        <div class="obj-container" style="top:15%; left:10%" onclick="openFact(this, 'ai')">
+            <img src="assets/image-removebg-preview(33).png" class="obj-img" alt="AI">
+        </div>
+        <div class="obj-container" style="top:10%; right:10%" onclick="openFact(this, 'visionpro')">
+            <img src="assets/image-removebg-preview(34).png" class="obj-img" alt="Vision Pro">
+        </div>
+        <div class="obj-container" style="bottom:15%; left:15%" onclick="openFact(this, 'foldable')">
+            <img src="assets/image-removebg-preview(35).png" class="obj-img" alt="Foldable">
+        </div>
+        <div class="obj-container" style="bottom:10%; right:8%" onclick="openFact(this, 'neuralink')">
+            <img src="assets/image-removebg-preview(36).png" class="obj-img" alt="Neural Chip">
+        </div>
+        <div class="obj-container" style="top:50%; left:85%" onclick="openFact(this, 'fusion')">
+            <img src="assets/image-removebg-preview(37).png" class="obj-img" alt="Fusion">
+        </div>
+    </section>
+
+ <script>
+        gsap.registerPlugin(ScrollTrigger);
+
+        // --- 1. MUSEUM DATABASE (RICH CONTENT) ---
+        const museumData = {
+            'gameboy': {
+                title: "Nintendo Game Boy (1989)",
+                text: "The Game Boy wasn't the most powerful handheld of its time—the Sega Game Gear had color, and the Atari Lynx was 16-bit. But the Game Boy had something better: 30 hours of battery life on 4 AA batteries. Designed by the legendary Gunpei Yokoi, its dot-matrix green screen is iconic. Launching with 'Tetris' was a masterstroke, positioning it not just as a toy for kids, but a gadget for everyone. It sold over 118 million units worldwide, defining mobile gaming for a generation."
+            },
+            'www': {
+                title: "The World Wide Web (1990)",
+                text: "Before 1990, the internet existed, but it was a cold, text-based void used mostly by academics and military. Tim Berners-Lee changed everything at CERN when he created the first web browser and web server on a NeXT computer. He gave the world HTML, URLs, and HTTP. The first website was just a page explaining what the web was. It was a humble beginning for a network that would eventually connect nearly every human being on the planet and contain the sum of human knowledge."
+            },
+            'photoshop': {
+                title: "Adobe Photoshop 1.0 (1990)",
+                text: "Released exclusively for the Macintosh in 1990, Photoshop 1.0 was a revelation. Before this, photo editing was a physical process involving airbrushes and darkrooms. Created by brothers Thomas and John Knoll, the software was initially just a program to display grayscale images. It evolved into the industry standard for digital art. Version 1.0 didn't even have layers, but it introduced the world to the magic of the 'Undo' command and digital manipulation."
+            },
+            'hubble': {
+                title: "Hubble Space Telescope (1990)",
+                text: "Launched in April 1990, the Hubble Space Telescope had a disastrous start: its primary mirror was ground incorrectly by 2.2 microns (1/50th the width of a hair), resulting in blurry images. It was a national embarrassment until a daring repair mission in 1993 fixed the optics. Since then, Hubble has captured the 'Pillars of Creation' and the 'Ultra Deep Field,' effectively looking back in time to the early universe and fundamentally changing our understanding of the cosmos."
+            },
+            'win3': {
+                title: "Windows 3.0 (1990)",
+                text: "This was the release that finally made Microsoft a household name in graphical computing. While Macs were expensive, Windows 3.0 brought a usable, colorful GUI to cheap PC clones. It introduced the famous Solitaire game, which was secretly designed to teach users how to 'drag and drop' with a mouse—a skill that was not intuitive at the time. It sold 10 million copies in two years, cementing the PC dominance of the 90s."
+            },
+            'ps1': {
+                title: "Sony PlayStation (1994)",
+                text: "Nintendo and Sega were the kings of gaming until Sony entered the arena. The PlayStation was originally supposed to be a Nintendo add-on, but after a business fallout, Sony went solo. By using CD-ROMs instead of cartridges, they allowed for massive storage (650MB vs 16MB), enabling full-motion video, orchestrated soundtracks, and complex 3D worlds like Final Fantasy VII. It was the first console to ship 100 million units."
+            },
+            'dvd': {
+                title: "DVD Technology (1995)",
+                text: "The Digital Versatile Disc killed the VHS tape. For the first time, you didn't have to rewind a movie. You could skip chapters instantly, watch behind-the-scenes features, and enjoy crystal clear 480p digital video. It was the fastest-adopted consumer electronics product in history at the time. The format war between DVD and DIVX was brief, with DVD emerging as the absolute standard for data and video storage for a decade."
+            },
+            'java': {
+                title: "Java Programming Language (1995)",
+                text: "Created by James Gosling at Sun Microsystems, Java's promise was revolutionary: 'Write Once, Run Anywhere.' In a world of fragmented operating systems, Java allowed code to run on any machine with a Java Virtual Machine (JVM). It powered the early interactive web via 'Applets' and eventually became the backbone of enterprise software and the Android operating system. Your Minecraft worlds and Android apps owe their existence to this language."
+            },
+            'toystory': {
+                title: "Toy Story (1995)",
+                text: "Pixar's Toy Story was the first feature-length computer-animated film. Before this, animation meant hand-drawn cels. Many critics doubted that audiences would connect emotionally with 'plastic' 3D characters. They were wrong. Woody and Buzz Lightyear proved that CGI could tell a story just as well as ink and paint. It required massive render farms and new technology, changing the film industry forever and leading to the decline of 2D animation."
+            },
+            'win95': {
+                title: "Windows 95 (1995)",
+                text: "The launch of Windows 95 was a cultural phenomenon. People camped overnight to buy software. The Rolling Stones were paid millions to let Microsoft use 'Start Me Up' for the commercials. It introduced the Start Button and the Taskbar, UI elements that we still use today. It made 'Plug and Play' a reality (mostly) and bundled Internet Explorer, sparking the first browser war against Netscape."
+            },
+            'nokia': {
+                title: "Nokia 3310 (2000)",
+                text: "The meme, the legend, the brick. The Nokia 3310 is famous for its indestructibility—you could drop it down a flight of stairs and the stairs would break. It had a battery that lasted for weeks, customizable Xpress-on covers, and the addictive game Snake II. It represents the peak of the pre-smartphone era, where phones were simple communication tools that just worked, no matter the conditions."
+            },
+            'usb': {
+                title: "USB Flash Drives (2000)",
+                text: "Before USB drives, moving files meant dealing with fragile, low-capacity 1.44MB floppy disks or burning CDs. The first USB drives, like the Trek ThumbDrive, offered 8MB of storage—tiny by today's standards, but a miracle back then. They were durable, rewritable, and plug-and-play. They killed the floppy disk almost overnight and became the universal standard for physical data transfer."
+            },
+            'ps2': {
+                title: "PlayStation 2 (2000)",
+                text: "The PS2 remains the best-selling video game console of all time, with over 155 million units sold. Its secret weapon wasn't just games like Grand Theft Auto: San Andreas or God of War; it was the built-in DVD player. For many families, the PS2 was their first DVD player, justifying the purchase as a movie machine that also played games. Its 'Emotion Engine' CPU was notoriously hard to program for but produced stunning results."
+            },
+            'sims': {
+                title: "The Sims (2000)",
+                text: "Will Wright designed a digital dollhouse that captivated the world. Unlike most games that focused on destruction or winning, The Sims was about mundane life: buying furniture, finding a job, and removing the pool ladder while your Sim was swimming. It appealed to a massive casual audience, including many who didn't consider themselves 'gamers,' becoming one of the best-selling PC franchises in history."
+            },
+            'cameraphone': {
+                title: "The Camera Phone (2000)",
+                text: "The J-Phone J-SH04 was the first mass-market phone with a built-in camera. The resolution was a laughable 0.11 megapixels, but the concept was revolutionary: 'Sha-Mail' (Picture Mail). It allowed people to instantly share visual moments. This humble beginning paved the way for Instagram, Snapchat, and the selfie culture that defines the modern social internet."
+            },
+            'youtube': {
+                title: "YouTube (2005)",
+                text: "Founded by three former PayPal employees, YouTube's first video was just a guy at the zoo talking about elephants. Before YouTube, hosting video online was expensive and technical. YouTube made it free and easy. It democratized broadcasting, allowing anyone with a webcam to become a star. Google bought it for $1.65 billion in 2006, a price that seemed high then but is now considered one of the best acquisitions in tech history."
+            },
+            'xbox': {
+                title: "Xbox 360 (2005)",
+                text: "Microsoft's second console defined the HD era. It introduced 'Achievements,' creating a gamified layer over gaming itself. Xbox Live became the gold standard for online multiplayer, bringing voice chat to the masses (for better or worse). However, it was plagued by the 'Red Ring of Death,' a hardware failure rate so high that it cost Microsoft over $1 billion in warranty repairs."
+            },
+            'maps': {
+                title: "Google Maps (2005)",
+                text: "Google Maps changed how we navigate the physical world. Before this, we used MapQuest (which required printing directions) or physical paper maps. Google introduced a draggable, interactive interface using 'AJAX' technology that felt like magic. With the later addition of Street View and GPS navigation on phones, getting lost became virtually impossible for the smartphone generation."
+            },
+            'guitarhero': {
+                title: "Guitar Hero (2005)",
+                text: "For a few years, everyone wanted to be a rock star. Guitar Hero came with a plastic guitar controller and a killer soundtrack. It was the ultimate party game, bridging the gap between music fans and gamers. It became a cultural phenomenon, boosting sales of real guitars and classic rock albums, before the market eventually crashed due to oversaturation of plastic instrument games."
+            },
+            'reddit': {
+                title: "Reddit (2005)",
+                text: "Calling itself 'The Front Page of the Internet,' Reddit replaced the fragmented world of forums. Its system of upvotes and downvotes allowed the best content to rise to the top (theoretically). Organized into 'subreddits,' it created micro-communities for every niche interest imaginable, from astrophysics to pictures of birds with arms. It became the internet's central hub for discussion, news, and memes."
+            },
+            'ipad': {
+                title: "Apple iPad (2010)",
+                text: "When Steve Jobs announced the iPad, people joked that it was just a 'big iPhone.' They were wrong. The iPad created the modern tablet market. It was the perfect device for 'lean-back' consumption—reading news, watching movies, and browsing the web on the couch. It found a home in schools, cockpits, and hospitals, proving that a touch-first computing interface could coexist with the traditional laptop."
+            },
+            'insta': {
+                title: "Instagram (2010)",
+                text: "Launched as a simple app to apply retro filters to square photos, Instagram exploded in popularity. It shifted social media from text-heavy updates (Facebook/Twitter) to purely visual storytelling. Facebook acquired it for $1 billion in 2012 when it had only 13 employees. Today, it defines influencer culture, fashion, and how we present our idealized selves to the world."
+            },
+            'angrybirds': {
+                title: "Angry Birds (2010)",
+                text: "A simple physics game about slinging birds at green pigs defined the early mobile gaming era. It was the first mobile game to become a global brand, spawning movies, merchandise, and theme parks. It proved that a $0.99 app could generate millions in revenue, setting the stage for the massive mobile gaming economy we see today."
+            },
+            'siri': {
+                title: "Siri (2011)",
+                text: "Integrated into the iPhone 4S, Siri was the first modern AI voice assistant on a smartphone. While early Siri was limited and often buggy, it opened the door to voice computing. It taught users to talk to their devices to set alarms, send texts, or check the weather. It paved the way for Alexa, Google Assistant, and the voice-first interfaces of the future."
+            },
+            'minecraft': {
+                title: "Minecraft (2011)",
+                text: "Originally created by one man, Markus 'Notch' Persson, Minecraft is the best-selling video game of all time. It dropped players into a blocky, procedurally generated world with no instructions. It became a digital Lego set for the world, teaching a generation of kids about logic (Redstone), creativity, and survival. It is a cultural juggernaut that transcends gaming."
+            },
+            'applewatch': {
+                title: "Apple Watch (2015)",
+                text: "Wearable tech existed before 2015 (Fitbit, Pebble), but the Apple Watch made it mainstream and fashionable. It shifted the focus from just counting steps to holistic health monitoring, including heart rate and ECGs. 'Closing your rings' became a daily obsession for millions. It solidified the smartwatch as a companion device rather than a phone replacement."
+            },
+            'echo': {
+                title: "Amazon Echo (2015)",
+                text: "The Amazon Echo brought 'Alexa' into the living room. It was a smart speaker that was always listening for its wake word. It popularized the concept of the smart home—controlling lights, thermostats, and music with just your voice. Despite privacy concerns, it became a staple in millions of homes, making voice interaction a normal part of domestic life."
+            },
+            'discord': {
+                title: "Discord (2015)",
+                text: "Built as a better alternative to Skype and TeamSpeak for gamers, Discord evolved into the 'third place' for the internet. Its server-based structure allowed communities to thrive with text channels and low-latency voice chat. It is now the default communication platform for web3, AI communities, gaming groups, and friends just hanging out online."
+            },
+            'spacex': {
+                title: "SpaceX Falcon 9 Landing (2015)",
+                text: "In December 2015, SpaceX did the impossible: they launched a rocket into space and landed the booster vertically back on Earth. This moment changed spaceflight economics forever. By making rockets reusable rather than disposable, SpaceX drastically lowered the cost of accessing orbit, reigniting public interest in space exploration and the dream of Mars."
+            },
+            'airpods': {
+                title: "Apple AirPods (2016)",
+                text: "When Apple removed the headphone jack and introduced AirPods, people mocked them as looking like broken toothbrushes. But the sheer convenience of seamless pairing and true wireless freedom won everyone over. They became a status symbol and the best-selling headphones in the world, effectively killing the wired earbud for the general consumer."
+            },
+            'zoom': {
+                title: "Zoom (2020)",
+                text: "During the COVID-19 pandemic, Zoom became critical infrastructure for the world. Overnight, offices, schools, and family gatherings moved to video squares. 'You're on mute' became the catchphrase of the year. Its stability and ease of use allowed the world to keep functioning while in lockdown, fundamentally changing our relationship with remote work."
+            },
+            'ps5': {
+                title: "PlayStation 5 (2020)",
+                text: "Launched during the pandemic, the PS5 was nearly impossible to buy for two years due to chip shortages. It introduced the DualSense controller with haptic feedback and adaptive triggers, allowing players to 'feel' the texture of virtual worlds. Its SSD eliminated loading times, a bottleneck that had plagued gaming for decades."
+            },
+            'm1': {
+                title: "Apple M1 Chip (2020)",
+                text: "Apple shocked the industry by dumping Intel processors and creating their own 'Apple Silicon.' The M1 chip was a masterpiece of efficiency. It allowed the MacBook Air to run faster than high-end PC laptops while generating so little heat that it didn't even need a fan. It proved that ARM-based architecture was the future of personal computing."
+            },
+            'tiktok': {
+                title: "TikTok (2020)",
+                text: "TikTok's algorithm is arguably the most advanced content recommendation engine ever built. It knows what you want to watch before you do. Its short-form, full-screen video format was so successful that Instagram (Reels) and YouTube (Shorts) copied it. It became the primary driver of youth culture, music hits, and internet trends."
+            },
+            'spacetourism': {
+                title: "Commercial Space Race (2021)",
+                text: "2021 saw billionaires Richard Branson (Virgin Galactic) and Jeff Bezos (Blue Origin) fly to the edge of space in their own rockets. While controversial, it marked the beginning of the space tourism era. Later, SpaceX's Inspiration4 mission sent four civilians into orbit for three days, proving that space is no longer the exclusive domain of government astronauts."
+            },
+            'ai': {
+                title: "Generative AI Boom (2023-2025)",
+                text: "With the release of ChatGPT and Midjourney, Artificial Intelligence moved from research labs to the hands of consumers. It can write code, pass the Bar exam, create photorealistic art, and compose music. We are currently living through this revolution, grappling with the ethical, economic, and creative implications of intelligence becoming a utility."
+            },
+            'visionpro': {
+                title: "Apple Vision Pro (2024)",
+                text: "Apple's entry into 'Spatial Computing.' It isn't just VR; it's a high-fidelity pass-through device that blends digital apps with your physical room. Controlled by eye-tracking and subtle hand gestures, it represents a potential post-smartphone future where screens are no longer physical objects but floating digital constructs."
+            },
+            'foldable': {
+                title: "Mature Foldables (2025)",
+                text: "After years of fragile prototypes, foldable phones finally hit maturity. Devices that unfold from a phone into a tablet are now durable, dust-resistant, and mainstream. They represent the first major form-factor change since the original iPhone, offering a glimpse into a future where screen size is no longer limited by pocket size."
+            },
+            'neuralink': {
+                title: "Neuralink Human Trials (2025)",
+                text: "Elon Musk's Neuralink began successful human trials, allowing paralyzed patients to control computers with their thoughts. This Brain-Computer Interface (BCI) technology is still in its infancy, but it promises to restore sight to the blind and mobility to the paralyzed, blurring the line between biology and technology."
+            },
+            'fusion': {
+                title: "Nuclear Fusion Milestones (2025)",
+                text: "Scientists achieved repeated 'net energy gain' in fusion reactions. While a commercial reactor is still years away, we have moved from 'science fiction' to 'engineering challenge.' Fusion offers the promise of limitless, clean energy—mimicking the power of the sun to solve humanity's energy crisis forever."
+            }
+        };
+
+        // --- 2. LOADER ---
+        window.addEventListener('load', () => {
+            gsap.to("#void-loader", {
+                opacity: 0, duration: 2, ease: "power2.inOut",
+                onComplete: () => document.getElementById("void-loader").style.display = 'none'
+            });
+        });
+
+        // --- 3. ELECTRIC FLOW CURSOR (Clean & Smooth) ---
+        const canvas = document.getElementById('cursor-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let mouse = { x: -100, y: -100 };
+        let trail = [];
+        let ripples = [];
+        const trailLength = 30; 
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            ripples.push({ x: e.clientX, y: e.clientY, r: 5, alpha: 1 });
+        });
+
+        function animateCursor() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Update Trail
+            trail.push({ x: mouse.x, y: mouse.y });
+            if (trail.length > trailLength) trail.shift();
+
+            // Draw Trail (Glowing Curve)
+            if (trail.length > 2) {
+                ctx.beginPath();
+                ctx.moveTo(trail[0].x, trail[0].y);
+                for (let i = 1; i < trail.length - 1; i++) {
+                    const xc = (trail[i].x + trail[i + 1].x) / 2;
+                    const yc = (trail[i].y + trail[i + 1].y) / 2;
+                    ctx.quadraticCurveTo(trail[i].x, trail[i].y, xc, yc);
+                }
+                ctx.lineCap = 'round';
+                ctx.lineWidth = 3;
+                // Electric Blue Glow
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#00ffff'; 
+                ctx.strokeStyle = 'rgba(200, 255, 255, 0.8)';
+                ctx.stroke();
+            }
+
+            // Draw Ripples (Clicks)
+            for (let i = 0; i < ripples.length; i++) {
+                const r = ripples[i];
+                ctx.beginPath();
+                ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(0, 255, 255, ${r.alpha})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                r.r += 4;
+                r.alpha -= 0.04;
+                if(r.alpha <= 0) {
+                    ripples.splice(i, 1);
+                    i--;
+                }
+            }
+
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+
+
+        // --- 4. SCROLL ANIMATIONS ---
+        gsap.utils.toArray("section").forEach((section) => {
+            let centerText = section.querySelector(".center-text");
+            let objects = section.querySelectorAll(".obj-container");
+
+            let tl = gsap.timeline({
+                scrollTrigger: {
+                    trigger: section,
+                    start: "top center", 
+                    end: "bottom center", 
+                    toggleActions: "play reverse play reverse",
+                    onEnter: () => enableInteraction(objects, true),
+                    onLeave: () => enableInteraction(objects, false),
+                    onEnterBack: () => enableInteraction(objects, true),
+                    onLeaveBack: () => enableInteraction(objects, false)
+                }
+            });
+
+            tl.to(centerText, { opacity: 1, duration: 0.8, ease: "power3.out" })
+            .to(objects, { opacity: 1, duration: 1, stagger: 0.1, ease: "back.out(1.7)" }, "-=0.5");
+        });
+
+        function enableInteraction(items, enable) {
+            items.forEach(item => {
+                if(enable) item.classList.add('clickable');
+                else item.classList.remove('clickable');
+            });
+        }
+
+        // --- 5. POPUP SYSTEM & SOUND FX ---
+        const overlay = document.getElementById('blur-overlay');
+        const bubble = document.getElementById('bubble');
+        const bubbleTitle = document.getElementById('bubble-title');
+        const bubbleText = document.getElementById('bubble-text');
+        const clickSfx = document.getElementById('sfx-click'); 
+        
+        let activeClone = null;
+        let activeOriginal = null; 
+
+        function openFact(element, id) {
+            // PLAY CLICK SOUND
+            clickSfx.currentTime = 0;
+            clickSfx.play().catch(e => console.log("Click sound blocked", e));
+
+            if(activeClone) closeModal();
+
+            activeOriginal = element.querySelector('.obj-img');
+            
+            const clone = activeOriginal.cloneNode(true);
+            const rect = activeOriginal.getBoundingClientRect();
+
+            clone.classList.add('clone-img');
+            clone.style.top = rect.top + 'px';
+            clone.style.left = rect.left + 'px';
+            clone.style.width = rect.width + 'px';
+            clone.style.height = rect.height + 'px';
+            
+            document.body.appendChild(clone);
+            activeClone = clone;
+
+            gsap.set(activeOriginal, { opacity: 0 });
+
+            // Animate to Center
+            const targetSize = 250;
+            const targetTop = (window.innerHeight / 2) - 150; 
+            const targetLeft = (window.innerWidth / 2) - (targetSize / 2);
+
+            gsap.to(clone, {
+                top: targetTop,
+                left: targetLeft,
+                width: targetSize,
+                height: targetSize,
+                rotation: 0,
+                duration: 0.5,
+                ease: "back.out(1.2)"
+            });
+
+            overlay.classList.add('active');
+            
+            // GET DATA FROM DB
+            const data = museumData[id];
+            bubbleTitle.innerText = data ? data.title : "UNKNOWN ARTIFACT";
+            bubbleText.innerText = ""; // Clear text for typing
+            
+            bubble.classList.add('active');
+            
+            if(data) typeWriter(data.text, 0);
+        }
+
+        function closeModal() {
+            if(!activeClone) return;
+
+            overlay.classList.remove('active');
+            bubble.classList.remove('active');
+
+            const rect = activeOriginal.getBoundingClientRect(); 
+
+            gsap.to(activeClone, {
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+                duration: 0.4,
+                ease: "power2.inOut",
+                onComplete: () => {
+                    activeClone.remove();
+                    activeClone = null;
+                    gsap.set(activeOriginal, { opacity: 1 });
+                    activeOriginal = null;
+                }
+            });
+        }
+
+        let typeTimeout;
+        function typeWriter(text, i) {
+            if (i === 0) clearTimeout(typeTimeout);
+            if (i < text.length) {
+                bubbleText.innerHTML += text.charAt(i);
+                typeTimeout = setTimeout(() => typeWriter(text, i + 1), 5); // Fast typing
+            }
+        }
+
+        window.addEventListener('scroll', () => { if(activeClone) closeModal(); });
+
+
+        // --- 6. BACKGROUND MUSIC & TAB FOCUS LOGIC ---
+        const tracks = {};
+        let userHasInteracted = false;
+        let currentYear = '1990'; // Default start
+
+        ['1990', '1995', '2000', '2005', '2010', '2015', '2020', '2025'].forEach(year => {
+            tracks[year] = document.getElementById('bgm-' + year);
+            if(tracks[year]) tracks[year].volume = 0;
+        });
+
+        // 6a. UNLOCK AUDIO
+        document.getElementById('start-btn').addEventListener('click', () => {
+            userHasInteracted = true;
+            document.getElementById('start-screen').style.opacity = '0';
+            setTimeout(() => document.getElementById('start-screen').style.display = 'none', 1000);
+            changeMusic('1990');
+        });
+
+        // 6b. SCROLL OBSERVER
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const newYear = entry.target.getAttribute('data-year');
+                    if (newYear !== currentYear) {
+                        currentYear = newYear; // Update global state
+                        changeMusic(currentYear);
+                    }
+                }
+            });
+        }, { threshold: 0.5 }); 
+
+        document.querySelectorAll('section').forEach(section => observer.observe(section));
+
+        // 6c. PAGE VISIBILITY LOGIC (The New Part)
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                // If user leaves tab -> PAUSE EVERYTHING
+                Object.values(tracks).forEach(track => {
+                    if (track) track.pause();
+                });
+            } else {
+                // If user returns -> RESUME CURRENT TRACK
+                if (userHasInteracted && tracks[currentYear]) {
+                    tracks[currentYear].play().catch(e => console.log("Resume failed", e));
+                    fadeAudio(tracks[currentYear], 0.3); // Ensure volume is up
+                }
+            }
+        });
+
+        function changeMusic(newYear) {
+            if(!userHasInteracted || document.hidden) return; // Don't play if hidden
+
+            Object.keys(tracks).forEach(year => {
+                if (year !== newYear) fadeAudio(tracks[year], 0);
+            });
+            if (tracks[newYear]) {
+                const playPromise = tracks[newYear].play();
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => fadeAudio(tracks[newYear], 0.3))
+                        .catch(e => console.log("Audio Play Failed:", e));
+                }
+            }
+        }
+
+        function fadeAudio(audio, targetVolume) {
+            if(!audio) return;
+            const step = 0.05;
+            const interval = setInterval(() => {
+                if (Math.abs(audio.volume - targetVolume) < step) {
+                    audio.volume = targetVolume;
+                    if(targetVolume === 0) audio.pause();
+                    clearInterval(interval);
+                } else if (audio.volume < targetVolume) {
+                    audio.volume += step;
+                } else {
+                    audio.volume -= step;
+                }
+            }, 100);
+        }
+    </script>
+</body>
+</html>
